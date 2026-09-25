@@ -1,0 +1,24 @@
+{
+ "limit_id": "codex",
+ "limit_name": null,
+ "normal_model_slug": null,
+ "primary": {
+  "used_percent": 13,
+  "window_minutes": 300,
+  "resets_at": 1790301885
+ },
+ "secondary": {
+  "used_percent": 27,
+  "window_minutes": 10080,
+  "resets_at": 1790691275
+ },
+ "credits": {
+  "has_credits": false,
+  "unlimited": false,
+  "balance": null
+ },
+ "individual_limit": null,
+ "spend_control_reached": false,
+ "plan_type": "team",
+ "rate_limit_reached_type": null
+}
