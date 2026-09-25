@@ -1,0 +1,64 @@
+id = "herdr-usage"
+name = "Usage gauges"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "AI agent usage-limit gauges in the Agents sidebar"
+platforms = ["linux", "macos"]
+
+# A server restart wipes every pane metadata token, so repopulate on startup.
+# Forced: the cache may be fresh but the sidebar is empty.
+[[startup]]
+command = ["python3", "main.py", "startup"]
+
+# Usage only moves when an agent works. These hooks read the cache and cost
+# ~10ms; they probe only when the cache is older than refresh.interval_secs.
+[[events]]
+on = "pane.agent_status_changed"
+command = ["python3", "main.py", "on-event"]
+
+[[events]]
+on = "pane.agent_detected"
+command = ["python3", "main.py", "on-event"]
+
+[[actions]]
+id = "refresh"
+title = "Usage: refresh now"
+description = "Probe every enabled provider and repaint the sidebar gauges"
+contexts = ["global"]
+command = ["python3", "main.py", "refresh"]
+
+[[actions]]
+id = "setup-sidebar"
+title = "Usage: install sidebar block"
+description = "Write the managed [ui.sidebar.agents] block into config.toml"
+contexts = ["global"]
+command = ["python3", "main.py", "setup-sidebar", "--force"]
+
+[[actions]]
+id = "remove-sidebar"
+title = "Usage: remove sidebar block"
+description = "Remove the managed block and stop auto-installing it"
+contexts = ["global"]
+command = ["python3", "main.py", "setup-sidebar", "--undo"]
+
+[[actions]]
+id = "print-sidebar"
+title = "Usage: print sidebar block"
+description = "Print the managed block for a remote client's own config.toml"
+contexts = ["global"]
+command = ["python3", "main.py", "print-sidebar"]
+
+[[actions]]
+id = "doctor"
+title = "Usage: doctor"
+description = "Show config paths, sidebar state, and probe each provider"
+contexts = ["global"]
+command = ["python3", "main.py", "doctor"]
+
+[[panes]]
+id = "settings"
+title = "Usage settings"
+placement = "popup"
+width = 64
+height = 22
+command = ["python3", "main.py", "settings"]
