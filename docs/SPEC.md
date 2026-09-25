@@ -188,10 +188,10 @@ Thresholds are plain numbers in the plugin config. Where a provider sends its ow
 
 | Token | Count |
 |---|---|
-| `uq_model`, `uq_plan`, `uq_burn`, `uq_extra` | 4 |
+| `uq_agent`, `uq_model`, `uq_plan`, `uq_burn`, `uq_extra` | 5 |
 | `uq_g<slug>_{ok,warn,crit,none}` per gauge | 4 each |
 
-Default (2 gauges) = 12. Worst realistic case (4 gauges) = 20. Limit is 32/pane.
+Default (2 gauges) = 13. Worst realistic case (4 gauges) = 21. Limit is 32/pane.
 Gauge keys are slugified to `^[A-Za-z0-9_-]{1,32}$` (`scoped:Fable` →
 `scoped_Fable`).
 

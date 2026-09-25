@@ -88,12 +88,20 @@ looks like `0%`:
 
 ## Settings
 
+Press **`prefix+u`** (`ctrl+b` then `u`), or:
+
 ```bash
-herdr plugin pane open herdr-usage.settings
+herdr plugin action invoke herdr-usage.settings
 ```
 
-A popup with every toggle: bar style (6 sets), bar width, which gauges to show,
-thresholds, refresh interval, per-provider enable.
+A popup with every toggle: bar style (6 sets), vendor icon set, bar width,
+which gauges to show, thresholds, refresh interval, per-provider enable.
+
+`setup-sidebar` installs that shortcut as part of its managed block, so
+`--undo` removes it again. If the key is already bound — by Herdr or by you —
+the block installs **without** a shortcut rather than hijacking it, and says
+so. Pick another with `display.settings_key`, or set it to `""` to skip the
+binding entirely.
 
 Or edit `~/.config/herdr/plugins/config/herdr-usage/config.toml` directly —
 your comments and formatting survive; the plugin only rewrites the one line it
@@ -111,6 +119,7 @@ gauges = ["5h", "wk"]
 show_model = true
 show_icon = true           # vendor icon before the model name
 icon_set = "brand"         # brand|geometric|ascii
+settings_key = "prefix+u"  # opens the settings popup; "" disables
 show_plan = false
 show_burn = false
 show_resets_in = false
@@ -162,6 +171,45 @@ python3 scripts/glyphcheck.py
 An unrecognised provider gets **no icon** rather than a default one: showing
 one vendor's logo next to another's model would be as misleading as showing
 the wrong percentage.
+
+## Remote clients
+
+Herdr draws the sidebar on the **client**, so each machine you view Herdr from
+needs the block in its own `config.toml`. The plugin runs on the server and
+cannot write that file — the SSH relationship points client → server, so a
+server cannot even enumerate the clients viewing it.
+
+Run the **`Usage: sync sidebar`** action: it installs the block locally and
+writes a copy to
+`~/.local/state/herdr/plugins/herdr-usage/sidebar-block.toml`. Paste that into
+the client machine's config, then use `reload config`.
+
+Per-OS client config paths:
+
+| OS | Path |
+|---|---|
+| Linux | `~/.config/herdr/config.toml` |
+| macOS | `~/Library/Application Support/herdr/config.toml` |
+| Windows | `%APPDATA%\herdr\config.toml` |
+
+Install the plugin on each machine whose quota you want to see — gauges are
+read from the agents logged in on that machine.
+
+`display.apply_to` controls what a settings save touches:
+
+| Value | Effect |
+|---|---|
+| `local` (default) | Write the block into this machine's config — the one drawing the UI |
+| `both` | Also stage a copy at `sidebar-block.toml` for another machine |
+
+The plugin never writes another machine's config. Herdr's SSH relationship
+runs client → server, so a server cannot enumerate — let alone edit — the
+clients viewing it.
+
+### Windows notes
+
+Windows CPython ships no `_curses`, so the settings popup falls back to a
+line-mode prompt with the same keys. Everything else is identical.
 
 ## Adding another provider
 
