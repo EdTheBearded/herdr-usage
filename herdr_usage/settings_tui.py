@@ -5,7 +5,9 @@ id, so an agent can never drive the real UI end to end. Everything that can
 be tested lives in `reduce`; the curses layer is only paint and key capture.
 """
 
+import contextlib
 import copy
+import io
 
 from .render import BAR_SETS, ICON_SETS
 
@@ -117,39 +119,125 @@ def reduce(state: dict, key) -> dict:
     return new
 
 
-def render_lines(state: dict) -> list[str]:
-    out = ["herdr-usage settings", ""]
+def render_lines(state: dict, rows: int | None = None, note: str = "") -> list[str]:
+    """Header, rows, then the control hint.
+
+    When `rows` is given the row list scrolls to keep the cursor visible, so
+    the hint line is never pushed off the bottom of a short popup -- losing it
+    is what makes the controls undiscoverable.
+
+    `note` is transient status ("saved") shown in the header, never appended
+    below: a growing message area is what pushed the menu out of alignment.
+    """
+    head = ["herdr-usage settings" + (f"   [{note}]" if note else ""), ""]
+    hint = ["", "j/k move  space/←→ change  s save  q cancel"]
+    body = []
     for i, (label, key, kind, _b) in enumerate(ROWS):
         value = _get(state["cfg"], key)
-        if kind == "bool":
-            shown = "on" if value else "off"
-        else:
-            shown = str(value)
-        out.append(f"{'>' if i == state['cursor'] else ' '} {label:<26} {shown}")
-    out += ["", "j/k move  space/←→ change  s save  q cancel"]
-    return out
+        shown = ("on" if value else "off") if kind == "bool" else str(value)
+        body.append(f"{'>' if i == state['cursor'] else ' '} {label:<26} {shown}")
+
+    if rows is None or rows >= len(head) + len(body) + len(hint):
+        return head + body + hint
+
+    room = max(1, rows - len(head) - len(hint))
+    start = min(max(0, state["cursor"] - room // 2), max(0, len(body) - room))
+    window = body[start:start + room]
+    if start:
+        window[0] = "  ↑ more"
+    if start + room < len(body):
+        window[-1] = "  ↓ more"
+    return head + window + hint
 
 
-def run(cfg: dict):  # pragma: no cover - needs a real terminal
-    """Curses shell. Returns the edited config on save, None on cancel."""
-    import curses
+def run_plain(cfg: dict, stdin=None, stdout=None, on_save=None):  # pragma: no cover - I/O loop
+    """Line-mode fallback for terminals without curses.
+
+    Windows CPython ships no `_curses` module at all, so the popup would be
+    unusable there. Same reducer, same keys, just redrawn as plain lines.
+    """
+    import sys as _sys
+
+    stdin = stdin or _sys.stdin
+    stdout = stdout or _sys.stdout
+    state = initial_state(cfg)
+    saved = None
+    note = ""
+    while True:
+        stdout.write("\n".join(render_lines(state, note=note)) + "\n> ")
+        stdout.flush()
+        note = ""
+        line = stdin.readline()
+        if not line:  # EOF: treat as cancel, never as a silent save
+            return saved
+        for ch in line.strip() or "\n":
+            state = reduce(state, ch)
+            if state["done"] is not None:
+                break
+        if state["done"] == "cancel":
+            return saved
+        if state["done"] == "save":
+            saved = copy.deepcopy(state["cfg"])
+            if on_save is None:
+                return saved
+            # Keep on_save's output off this screen too, so the menu below
+            # stays aligned.
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                on_save(saved)
+            note = "saved"
+            state = dict(state, done=None)
+
+
+def run(cfg: dict, on_save=None):  # pragma: no cover - needs a real terminal
+    """Curses shell. Returns the edited config on save, None on cancel.
+
+    With `on_save` the popup stays open: each save persists and refreshes in
+    place, so the gauges update without losing your place in the list. The
+    reducer still reports done="save" -- only this shell decides to continue.
+    """
+    try:
+        import curses
+    except ImportError:
+        return run_plain(cfg, on_save=on_save)
 
     def _loop(scr):
-        curses.curs_set(0)
         state = initial_state(cfg)
-        while state["done"] is None:
+        saved = None
+        note = ""
+        curses.curs_set(0)
+        while True:
             scr.erase()
-            for i, line in enumerate(render_lines(state)):
+            rows, cols = scr.getmaxyx()
+            lines = render_lines(state, rows=rows, note=note)
+            for i, line in enumerate(lines[:rows]):
                 try:
-                    scr.addstr(i, 0, line[: curses.COLS - 1])
+                    scr.addstr(i, 0, line[: cols - 1])
                 except curses.error:
                     pass
+            scr.clrtobot()
             scr.refresh()
             try:
-                state = reduce(state, scr.getkey())
+                key = scr.getkey()
             except curses.error:
                 continue
-        return state
+            note = ""
+            state = reduce(state, key)
 
-    state = curses.wrapper(_loop)
-    return state["cfg"] if state["done"] == "save" else None
+            if state["done"] == "cancel":
+                return saved
+            if state["done"] == "save":
+                saved = copy.deepcopy(state["cfg"])
+                if on_save is None:
+                    return saved
+                # on_save writes files and shells out to `herdr`; anything it
+                # prints would land on the raw terminal underneath curses and
+                # desync the screen. Capture it, then repaint from scratch.
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                    on_save(saved)
+                note = "saved"
+                state = dict(state, done=None)
+                scr.clear()  # full repaint, not a diff against a stale model
+
+    return curses.wrapper(_loop)
