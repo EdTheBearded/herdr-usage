@@ -149,14 +149,21 @@ def refresh(cfg, cache_data, panes, probes, now=None, force: bool = False) -> di
         if display.get("show_model") and pane.get("model"):
             extras["model"] = pane["model"]
         if display.get("show_icon", True):
-            # Icon follows the billed provider, falling back to an explicit
-            # vendor hint for panes that consume no quota (local endpoints).
-            icon = render.icon_for(
-                provider or pane.get("vendor"),
-                display.get("icon_set", "brand"),
+            icon_set = display.get("icon_set", "brand")
+            # Harness icon names the tool running in the pane (hermes, claude,
+            # codex); the model token stays on its own line with the gauges.
+            harness = render.icon_for(pane.get("agent"), icon_set)
+            if harness:
+                extras["agent"] = harness
+            # Vendor icon follows the BILLED provider, which for a wrapper
+            # differs from the harness -- that difference is the point.
+            vendor = render.icon_for(
+                provider or pane.get("vendor"), icon_set
             )
-            if icon:
-                extras["model"] = f"{icon} {extras['model']}" if extras.get("model") else icon
+            if vendor and vendor != harness:
+                extras["model"] = (
+                    f"{vendor} {extras['model']}" if extras.get("model") else vendor
+                )
 
         stamp = entry.get("fetched_at")
         stale = bool(stamp) and (now - stamp) > stale_after

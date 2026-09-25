@@ -4,8 +4,10 @@ Writing into the user's own config.toml is the riskiest thing this plugin
 does, so every write is validated on a copy first and rolled back on failure.
 """
 
+import json
 import os
 import pathlib
+import re
 import shutil
 import tempfile
 
@@ -39,19 +41,43 @@ def _slug(key: str) -> str:
     return slug(key)
 
 
+def keybind(cfg: dict) -> str:
+    """The optional `[[keys.command]]` entry opening the settings popup.
+
+    Lives in the same managed block as the sidebar rows so install and undo
+    stay a single marker pair -- a second mechanism would be a second thing
+    to leave behind on uninstall.
+    """
+    key = ((cfg.get("display") or {}).get("settings_key") or "").strip()
+    if not key:
+        return ""
+    return (
+        "\n[[keys.command]]\n"
+        f'key = "{key}"\n'
+        'type = "plugin_action"\n'
+        'command = "herdr-usage.settings"\n'
+        'description = "edit agent usage gauges"\n'
+    )
+
+
 def generate(cfg: dict) -> str:
     display = cfg.get("display") or {}
     rows = []
 
-    # `machine` renders only when the client has >1 machine connected, and
-    # drops itself otherwise -- so it costs nothing on a single-machine setup
-    # and prevents two machines' gauges from being indistinguishable.
+    # Line 1 identifies the machine and harness; the model and its gauges go
+    # below, so a 26-column sidebar stops truncating the header.
     head = ['"state_icon"', '"machine"', '"agent"']
-    if display.get("show_model"):
-        head.append('"$uq_model"')
-    if display.get("show_plan"):
-        head.append('"$uq_plan"')
+    if display.get("show_icon", True):
+        head.append('"$uq_agent"')
     rows.append("  [" + ", ".join(head) + "],")
+
+    second = []
+    if display.get("show_model"):
+        second.append('"$uq_model"')
+    if display.get("show_plan"):
+        second.append('"$uq_plan"')
+    if second:
+        rows.append("  [" + ", ".join(second) + "],")
 
     for key in display.get("gauges") or []:
         base = f"uq_g{_slug(key)}"
@@ -79,7 +105,33 @@ def generate(cfg: dict) -> str:
         "[ui.sidebar.agents]\n"
         "row_gap = 0\n"
         "rows = [\n" + "\n".join(rows) + "\n]\n"
-    )
+    ) + keybind(cfg)
+
+
+def tokens_in(block: str) -> set:
+    """Every `$uq_*` token a rendered block references."""
+    return set(re.findall(r"\$?(uq_[A-Za-z0-9_]+)", block))
+
+
+def layout_changed(cfg: dict) -> bool:
+    """Did this save change which tokens the sidebar must reference?
+
+    The plugin runs on the server and cannot read a remote client's config,
+    so it never claims to know that client's state. What it does know is its
+    own token set: if that changed, every client's block is now out of date.
+    """
+    stamp = state_dir() / "layout-tokens.json"
+    current = sorted(tokens_in(generate(cfg)))
+    try:
+        previous = json.loads(stamp.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        previous = None
+    if previous != current:
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(json.dumps(current), encoding="utf-8")
+        # First run has nothing to compare against; install already handled it.
+        return previous is not None
+    return False
 
 
 def _strip(text: str) -> str:
@@ -105,6 +157,27 @@ def _wrap(block: str) -> str:
     if body.startswith(BEGIN):
         return body
     return f"{BEGIN}\n{body}{END}\n"
+
+
+def key_in_use(text: str, key: str) -> bool:
+    """Is `key` already bound OUTSIDE our managed block?
+
+    Config is read as text rather than parsed: an action binding
+    (`goto = "prefix+g"`) and a command binding (`key = "prefix+g"`) are
+    different shapes, and a commented-out Herdr default is a reservation we
+    should also respect. Our own block is excluded so reinstalling is
+    idempotent.
+    """
+    if not key:
+        return False
+    outside = _strip(text)
+    pattern = re.compile(
+        r'^\s*(?:#\s*)?[A-Za-z_]+\s*=\s*(?:\[[^\]]*\]|"[^"]*")', re.M
+    )
+    for line in pattern.findall(outside):
+        if f'"{key}"' in line:
+            return True
+    return False
 
 
 def install(config_path, block: str, check=None) -> bool:

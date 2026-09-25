@@ -113,21 +113,71 @@ def cmd_setup_sidebar(undo: bool = False) -> int:
 
 def _install(path: pathlib.Path) -> int:
     cfg = config.load(_config_path())
+
+    # Never steal a key the user already bound. Drop our binding instead and
+    # say so -- a silently hijacked shortcut is worse than no shortcut.
+    key = (cfg.get("display") or {}).get("settings_key") or ""
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if key and sidebar.key_in_use(existing, key):
+        print(f"{key} is already bound; installing without a shortcut",
+              file=sys.stderr)
+        print("set display.settings_key in the plugin config to pick another")
+        cfg["display"]["settings_key"] = ""
+
     if sidebar.install(path, sidebar.generate(cfg)):
         print(f"sidebar block written to {path}")
+        # A successful install contradicts the uninstall marker; leaving it
+        # would make the next plain run refuse to re-add a block that is
+        # already there.
+        sidebar.clear_marker()
+        if cfg["display"].get("settings_key"):
+            print(f"press {cfg['display']['settings_key']} to edit the gauges")
         herdrctl._run(["server", "reload-config"], check=False)
         return 0
     print(f"config check failed; {path} left untouched", file=sys.stderr)
     return 1
 
 
-def cmd_settings() -> int:
-    from herdr_usage import settings_tui
+def cmd_sync_sidebar() -> int:
+    """Install the block locally and stage it for any remote client.
 
-    path = _config_path()
-    edited = settings_tui.run(config.load(path))
-    if edited is None:
+    Herdr draws the sidebar on the client, and a client that connects to this
+    machine keeps its own config.toml. The server cannot write that file --
+    the SSH relationship points the other way -- so the best it can do is
+    install locally and leave the exact block somewhere easy to fetch.
+    """
+    code = _install(_herdr_config())
+    block = sidebar.generate(config.load(_config_path()))
+    out = sidebar.state_dir() / "sidebar-block.toml"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(block, encoding="utf-8")
+
+    peers = herdrctl.machines()
+    if peers:
+        names = ", ".join(
+            str(m.get("label") or m.get("host") or m.get("id")) for m in peers
+        )
+        print(f"\nsaved machines: {names}")
+        print("each one renders its own sidebar, so install herdr-usage there too")
+    print(f"\nblock for remote clients saved to {out}")
+    print("on the client machine, paste it into its own config.toml")
+    return code
+
+
+def cmd_open_settings() -> int:
+    """Action target for the keybind: ask Herdr to open the settings popup.
+
+    The keybind cannot open a [[panes]] entry directly, so this thin action
+    stands between the two.
+    """
+    if herdrctl.open_pane("herdr-usage", "settings-pane"):
         return 0
+    print("could not open the settings popup", file=sys.stderr)
+    return 1
+
+
+def _persist(path: pathlib.Path, edited: dict) -> None:
+    """Write the edited values, reinstall the block, repaint the gauges."""
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         path.write_text("# herdr-usage configuration\n", encoding="utf-8")
@@ -139,7 +189,26 @@ def cmd_settings() -> int:
             else:
                 config.set_value(path, f"{table}.{key}", value)
     _install(_herdr_config())
-    return cmd_refresh(force=True)
+    cmd_refresh(force=True)
+
+    # The config this just wrote belongs to the machine running the plugin.
+    # Herdr renders the sidebar on the CLIENT, which on a server setup is a
+    # different machine -- say so rather than pretend we updated it.
+    if sidebar.layout_changed(config.load(path)):
+        herdrctl.notify(
+            "herdr-usage: sidebar layout changed",
+            "Other machines need the new block. Run the "
+            "'Usage: sync sidebar' action there.",
+        )
+
+
+def cmd_settings() -> int:
+    from herdr_usage import settings_tui
+
+    path = _config_path()
+    # on_save keeps the popup open: save applies and refreshes in place.
+    settings_tui.run(config.load(path), on_save=lambda edited: _persist(path, edited))
+    return 0
 
 
 def cmd_print_sidebar() -> int:
@@ -182,7 +251,7 @@ def cmd_doctor() -> int:
 def usage() -> int:
     print((__doc__ or "herdr-usage").strip())
     print("\ncommands: refresh | startup | on-event | setup-sidebar [--undo]"
-          " | settings | print-sidebar | doctor")
+          " | sync-sidebar | settings | open-settings | print-sidebar | doctor")
     return 2
 
 
@@ -203,6 +272,10 @@ if __name__ == "__main__":
             )
         elif cmd == "settings":
             code = cmd_settings()
+        elif cmd == "open-settings":
+            code = cmd_open_settings()
+        elif cmd == "sync-sidebar":
+            code = cmd_sync_sidebar()
         elif cmd == "print-sidebar":
             code = cmd_print_sidebar()
         elif cmd == "doctor":

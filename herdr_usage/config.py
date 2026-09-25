@@ -14,6 +14,9 @@ DEFAULTS = {
         "show_model": True,
         "show_icon": True,
         "icon_set": "brand",
+        # Opens the settings popup. prefix+u for "usage"; empty disables the
+        # binding entirely. install() refuses to claim a key already bound.
+        "settings_key": "prefix+u",
         "show_plan": False,
         "show_burn": False,
         "show_resets_in": False,

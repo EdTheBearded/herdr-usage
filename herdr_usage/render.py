@@ -25,18 +25,21 @@ ICON_SETS = {
         "anthropic": "\uec82",
         "openai": "\uec81",
         "copilot": "\uec1e",
+        "hermes": "\uec67",   # cod-agent: the harness running in the pane
         "local": "\uec20",
     },
     "geometric": {
         "anthropic": "◆",
         "openai": "◇",
         "copilot": "◉",
+        "hermes": "◎",
         "local": "⌂",
     },
     "ascii": {
         "anthropic": "[A]",
         "openai": "[G]",
         "copilot": "[C]",
+        "hermes": "[H]",
         "local": "[L]",
     },
 }
@@ -49,6 +52,7 @@ PROVIDER_ICONS = {
     "codex": "openai",
     "openai": "openai",
     "copilot": "copilot",
+    "hermes": "hermes",
     "local": "local",
 }
 
@@ -154,7 +158,7 @@ def build_tokens(gauges, extras=None, cells: int = 10, bar_set: str = "blocks",
             else:
                 clear.append(key)
 
-    for field in ("model", "plan", "burn", "extra"):
+    for field in ("agent", "model", "plan", "burn", "extra"):
         key = f"uq_{field}"
         value = (extras or {}).get(field)
         if value:

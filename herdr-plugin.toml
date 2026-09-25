@@ -3,7 +3,7 @@ name = "Usage gauges"
 version = "0.1.0"
 min_herdr_version = "0.9.0"
 description = "AI agent usage-limit gauges in the Agents sidebar"
-platforms = ["linux", "macos"]
+platforms = ["linux", "macos", "windows"]
 
 # A server restart wipes every pane metadata token, so repopulate on startup.
 # Forced: the cache may be fresh but the sidebar is empty.
@@ -55,8 +55,24 @@ description = "Show config paths, sidebar state, and probe each provider"
 contexts = ["global"]
 command = ["python3", "main.py", "doctor"]
 
-[[panes]]
+[[actions]]
+id = "sync-sidebar"
+title = "Usage: sync sidebar"
+description = "Install the block here and stage it for remote clients"
+contexts = ["global"]
+command = ["python3", "main.py", "sync-sidebar"]
+
+[[actions]]
 id = "settings"
+title = "Usage: settings"
+description = "Open the settings popup"
+contexts = ["global"]
+# A keybind's type = "plugin_action" resolves [[actions]] only, never
+# [[panes]], so opening the popup needs an action that asks Herdr to open it.
+command = ["python3", "main.py", "open-settings"]
+
+[[panes]]
+id = "settings-pane"
 title = "Usage settings"
 placement = "popup"
 width = 64

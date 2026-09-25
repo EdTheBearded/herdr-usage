@@ -675,7 +675,9 @@ class TestBuildTokens(unittest.TestCase):
     def test_empty_gauges_emits_only_extras(self):
         tokens, clear = build_tokens([])
         self.assertEqual(tokens, {})
-        self.assertEqual(set(clear), {"uq_model", "uq_plan", "uq_burn", "uq_extra"})
+        # uq_agent added when the harness icon moved to its own sidebar line.
+        self.assertEqual(set(clear),
+                         {"uq_agent", "uq_model", "uq_plan", "uq_burn", "uq_extra"})
 
     def test_tokens_and_clear_never_overlap(self):
         gauges = [Gauge("5h", "5h", pct=31.0), Gauge("wk", "wk", pct=None),
@@ -684,16 +686,16 @@ class TestBuildTokens(unittest.TestCase):
         self.assertEqual(set(tokens) & set(clear), set())
 
     def test_token_budget_for_two_gauges_is_twelve(self):
-        """SPEC §5.4: default 2 gauges = 12 tokens (4 extras + 4 per gauge)."""
+        """SPEC §5.4: default 2 gauges = 13 tokens (5 extras + 4 per gauge)."""
         tokens, clear = build_tokens(
             [Gauge("5h", "5h", pct=31.0), Gauge("wk", "wk", pct=82.0)],
             extras={"model": "Opus"})
-        self.assertEqual(len(tokens) + len(clear), 12)
+        self.assertEqual(len(tokens) + len(clear), 13)
 
     def test_token_budget_for_four_gauges_is_twenty(self):
         gauges = [Gauge(k, k, pct=10.0) for k in ("5h", "wk", "mo", "scoped:Fable")]
         tokens, clear = build_tokens(gauges, extras={"model": "Opus"})
-        self.assertEqual(len(tokens) + len(clear), 20)
+        self.assertEqual(len(tokens) + len(clear), 21)
         self.assertLessEqual(len(tokens) + len(clear), 32)
 
     def test_stale_flag_reaches_the_rendered_value(self):

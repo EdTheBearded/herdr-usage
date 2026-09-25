@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import textwrap
 
 SOURCE = "herdr-usage"
 
@@ -69,3 +70,79 @@ def config_check(config_path=None) -> bool:
     except OSError:
         return False
     return proc.returncode == 0 and "issues" not in (proc.stdout or "").lower()
+
+
+def machines() -> list[dict]:
+    """Saved SSH machines, as seen from THIS machine.
+
+    Only meaningful in the client->server direction: a Herdr server cannot
+    enumerate the clients viewing it, so this never proves a remote client
+    exists -- it proves this machine has remote peers of its own.
+    """
+    try:
+        proc = _run(["machine", "list", "--json"], check=False)
+        doc = json.loads(proc.stdout or "[]")
+    except (OSError, ValueError):
+        return []
+    if isinstance(doc, dict):
+        doc = doc.get("result", doc)
+        doc = doc.get("machines", []) if isinstance(doc, dict) else doc
+    return [m for m in doc if isinstance(m, dict)] if isinstance(doc, list) else []
+
+
+def client_width(default: int = 60) -> int:
+    """Narrowest pane area the client is currently drawing.
+
+    Herdr renders toasts on the client, and the server cannot ask it for a
+    terminal size -- but the layout snapshot carries the real pane geometry,
+    which is the same width budget a toast has to live in.
+    """
+    try:
+        proc = _run(["api", "snapshot"], check=False)
+        layouts = json.loads(proc.stdout)["result"]["snapshot"]["layouts"]
+        widths = [
+            int(l["area"]["width"]) for l in layouts
+            if isinstance(l.get("area"), dict) and l["area"].get("width")
+        ]
+    except (OSError, ValueError, KeyError, TypeError):
+        return default
+    return min(widths) if widths else default
+
+
+def wrap_body(text: str, width: int, max_lines: int = 4) -> str:
+    """Wrap a toast body to the client's width.
+
+    textwrap counts characters, which is right here: these messages are plain
+    ASCII. Gauge strings, which do carry wide glyphs, never reach a toast.
+    """
+    width = max(20, int(width) - 6)  # toast padding/border
+    lines = []
+    for para in str(text).splitlines() or [""]:
+        lines.extend(textwrap.wrap(para, width) or [""])
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1][: width - 1].rstrip() + "…"
+    return "\n".join(lines)
+
+
+def notify(title: str, body: str = "", width: int | None = None) -> bool:
+    args = ["notification", "show", title]
+    if body:
+        args += ["--body", wrap_body(body, client_width() if width is None else width)]
+    try:
+        return _run(args, check=False).returncode == 0
+    except OSError:
+        return False
+
+
+def open_pane(plugin: str, entrypoint: str) -> bool:
+    """Ask Herdr to open a plugin-owned pane.
+
+    `herdr plugin pane open` takes --plugin/--entrypoint flags; the dotted
+    `plugin.entrypoint` form is rejected as an unknown option.
+    """
+    proc = _run(
+        ["plugin", "pane", "open", "--plugin", plugin, "--entrypoint", entrypoint],
+        check=False,
+    )
+    return '"type":"ok"' in (proc.stdout or "").replace(" ", "")
