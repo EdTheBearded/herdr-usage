@@ -151,8 +151,9 @@ def state_dir() -> pathlib.Path:
     env = os.environ.get("HERDR_PLUGIN_STATE_DIR")
     if env:
         return pathlib.Path(env)
-    base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
-    return pathlib.Path(base) / "herdr" / "plugins" / "herdr-usage"
+    from .paths import state_home
+
+    return state_home() / "herdr" / "plugins" / "herdr-usage"
 
 
 def marker_path() -> pathlib.Path:

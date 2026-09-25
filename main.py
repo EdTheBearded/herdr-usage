@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from herdr_usage import cache, config, herdrctl, main, providers, sidebar
+from herdr_usage import cache, config, herdrctl, main, paths, providers, sidebar
 
 PLUGIN_ID = "herdr-usage"
 
@@ -21,8 +21,7 @@ def _config_dir() -> pathlib.Path:
     env = os.environ.get("HERDR_PLUGIN_CONFIG_DIR")
     if env:
         return pathlib.Path(env)
-    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return pathlib.Path(base) / "herdr" / "plugins" / "config" / PLUGIN_ID
+    return paths.config_home() / "herdr" / "plugins" / "config" / PLUGIN_ID
 
 
 def _config_path() -> pathlib.Path:
@@ -34,11 +33,7 @@ def _cache_path() -> pathlib.Path:
 
 
 def _herdr_config() -> pathlib.Path:
-    env = os.environ.get("HERDR_CONFIG_PATH")
-    if env:
-        return pathlib.Path(env)
-    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return pathlib.Path(base) / "herdr" / "config.toml"
+    return paths.herdr_config()
 
 
 def _probes(cfg):
