@@ -1,9 +1,7 @@
 """Independent unittest suite for herdr_usage core modules.
 
-Written from docs/SPEC.md + docs/API.md ONLY. The implementation and the
-pre-existing tests/ suite were never read. Every expectation below cites the
-spec rule it defends; a failure here is a spec-vs-behaviour discrepancy to be
-reported, not silently accommodated.
+The implementation and the pre-existing `tests/` suite were not supplied to
+the author. A failure here is a behaviour discrepancy to investigate.
 
 Run:  cd /home/ed/herdr-usage && python3 -m unittest discover -s tests_indep -t .
 """

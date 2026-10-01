@@ -1,5 +1,5 @@
 id = "herdr-usage"
-name = "Usage gauges"
+name = "Herdr Usage Gauges"
 version = "0.1.0"
 min_herdr_version = "0.9.0"
 description = "AI agent usage-limit gauges in the Agents sidebar"

@@ -1,17 +1,9 @@
-"""Independent, spec-driven unit tests for the herdr-usage infrastructure modules.
+"""Independent unit tests for the herdr-usage infrastructure modules.
 
-Written from docs/SPEC.md and docs/API.md ONLY -- the implementation and the
-project's own tests were deliberately not read.  The suite is therefore a RED
-specification: until each module lands, its class skips.
+The implementation and the primary test suite were not supplied to this author.
 
-Scope: herdr_usage.config (T8), .cache (T9), .sidebar (T10), .herdrctl (T12),
-       .main.refresh (T13), .settings_tui.reduce (T14).
-
-Where docs/API.md left a shape undefined (state dict of the settings reducer,
-the `probes` container of refresh, the JSON envelope of `herdr pane list`, the
-uninstall-marker location) the tests probe tolerantly for any reasonable shape
-rather than pinning one arbitrary choice.  Every such spot is marked
-`SPEC GAP` and repeated in the final report.
+Scope: herdr_usage.config, .cache, .sidebar, .herdrctl, .main.refresh, and
+.settings_tui.reduce.
 """
 
 from __future__ import annotations
@@ -1274,10 +1266,10 @@ class TestMainRefresh(unittest.TestCase):
 # --------------------------------------------------------------------------
 # herdr_usage.settings_tui.reduce -- T14
 # --------------------------------------------------------------------------
-# SPEC GAP: docs/API.md gives `reduce(state, key) -> state` but never the state
-# layout or the key encoding. These tests therefore (a) prefer a factory the
-# module itself exposes, (b) fall back to a documented minimal shape, and
-# (c) try several spellings of each key, requiring only that ONE works.
+# Compatibility note: `reduce(state, key)` does not prescribe the state layout
+# or key encoding. These tests therefore (a) prefer a factory the module exposes,
+# (b) fall back to a documented minimal shape, and (c) try several spellings of
+# each key, requiring only that one works.
 DOWN_KEYS = ("j", "KEY_DOWN", "\x1b[B", 258)
 UP_KEYS = ("k", "KEY_UP", "\x1b[A", 259)
 TOGGLE_KEYS = (" ", "\n", "\r", "KEY_ENTER", "t", 10, 32)

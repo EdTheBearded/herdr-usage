@@ -1,7 +1,7 @@
-# herdr-usage
+# Herdr Usage Gauges
 
 AI agent usage limits as coloured gauges in the [Herdr](https://herdr.dev)
-Agents sidebar.
+Agents sidebar. The plugin ID is `herdr-usage`.
 
 ```
 ┌──────────────────────────┐
@@ -172,45 +172,6 @@ An unrecognised provider gets **no icon** rather than a default one: showing
 one vendor's logo next to another's model would be as misleading as showing
 the wrong percentage.
 
-## Remote clients
-
-Herdr draws the sidebar on the **client**, so each machine you view Herdr from
-needs the block in its own `config.toml`. The plugin runs on the server and
-cannot write that file — the SSH relationship points client → server, so a
-server cannot even enumerate the clients viewing it.
-
-Run the **`Usage: sync sidebar`** action: it installs the block locally and
-writes a copy to
-`~/.local/state/herdr/plugins/herdr-usage/sidebar-block.toml`. Paste that into
-the client machine's config, then use `reload config`.
-
-Per-OS client config paths:
-
-| OS | Path |
-|---|---|
-| Linux | `~/.config/herdr/config.toml` |
-| macOS | `~/Library/Application Support/herdr/config.toml` |
-| Windows | `%APPDATA%\herdr\config.toml` |
-
-Install the plugin on each machine whose quota you want to see — gauges are
-read from the agents logged in on that machine.
-
-`display.apply_to` controls what a settings save touches:
-
-| Value | Effect |
-|---|---|
-| `local` (default) | Write the block into this machine's config — the one drawing the UI |
-| `both` | Also stage a copy at `sidebar-block.toml` for another machine |
-
-The plugin never writes another machine's config. Herdr's SSH relationship
-runs client → server, so a server cannot enumerate — let alone edit — the
-clients viewing it.
-
-### Windows notes
-
-Windows CPython ships no `_curses`, so the settings popup falls back to a
-line-mode prompt with the same keys. Everything else is identical.
-
 ## Adding another provider
 
 Declaratively, no code. Give it a command that prints JSON and say where the
@@ -337,8 +298,12 @@ block** into the client's own `config.toml`:
 
 | Client OS | Config path |
 |---|---|
-| Linux / macOS | `~/.config/herdr/config.toml` |
+| Linux | `~/.config/herdr/config.toml` |
+| macOS | `~/Library/Application Support/herdr/config.toml` |
 | Windows | `%APPDATA%\herdr\config.toml` |
+
+On Windows, CPython has no `_curses`, so the settings popup uses a line-mode
+prompt with the same keys.
 
 Print the block from the server and paste it there:
 
@@ -393,7 +358,8 @@ If you'd rather not let the plugin edit your config, add this yourself:
 [ui.sidebar.agents]
 row_gap = 0
 rows = [
-  ["state_icon", "machine", "agent", "$uq_model"],
+  ["state_icon", "machine", "agent", "$uq_agent"],
+  ["$uq_model", "$uq_plan"],
   [
     { token = "$uq_g5h_ok", fg = "#a6e3a1" },
     { token = "$uq_g5h_warn", fg = "#f9e2af" },
@@ -406,6 +372,7 @@ rows = [
     { token = "$uq_gwk_crit", fg = "#f38ba8", bold = true },
     { token = "$uq_gwk_none", fg = "#6c7086", dim = true },
   ],
+  ["$uq_burn"],
   ["workspace", "tab"],
 ]
 # <<< herdr-usage managed block
@@ -441,9 +408,8 @@ python3 -m unittest discover -s tests -t .          # authored alongside the cod
 python3 -m unittest discover -s tests_indep -t .    # written independently
 ```
 
-`tests_indep/` was written by an author working only from `docs/SPEC.md` and
-`docs/API.md`, with no access to the implementation — it caught three bugs the
-first suite missed. Both suites are kept separate on purpose.
+`tests_indep/` is deliberately separate from the implementation and primary
+suite. It caught three bugs the first suite missed.
 
 ## Licence
 
