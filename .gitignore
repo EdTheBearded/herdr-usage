@@ -5,3 +5,4 @@ __pycache__/
 # session working notes, not product
 progress.md
 task_plan.md
+docs/*
